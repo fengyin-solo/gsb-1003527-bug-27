@@ -46,6 +46,7 @@
           <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
           <td>{{ row.status }}</td>
           <td class="row-actions">
+            <RouterLink class="link" :to="`/telemetry/${row.id}`">详情</RouterLink>
             <button
               v-for="action in actions"
               :key="action"
@@ -73,25 +74,27 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import {
-  downloadEntries,
-  listEntries,
-  moduleMeta,
-  runAction as applyAction,
-} from '@/api/local-service'
+import { downloadEntries, listEntries, moduleMeta } from '@/api/local-service'
+import { confirmRepair, reportDeviceFault, retireDevice } from '@/api/repair-service'
+import { useSessionStore } from '@/stores/session'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('telemetry')
 const columns = ["设备编号", "设备类型", "所属站点", "通讯方式", "安装日期", "最近维护日", "电池余量", "设备状态"]
 const actions = ["报修设备", "确认修复", "停用设备"]
 const statuses = ["正常运行", "信号异常", "低电量", "待维修", "已停用"]
-const stats = [{"label": "设备总数", "value": 0}, {"label": "正常运行数", "value": 0}, {"label": "待维修数", "value": 0}]
 
+const store = useSessionStore()
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const stats = computed(() => [
+  { label: '设备总数', value: rows.value.length },
+  { label: '正常运行数', value: rows.value.filter((row) => row.status === '正常运行').length },
+  { label: '待维修数', value: rows.value.filter((row) => row.status === '待维修').length },
+])
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -112,9 +115,17 @@ function openCreate() {
   errorMessage.value = '遥测设备登记入口尚未接入审批流'
 }
 
+// 报修与修复必须一次落库设备、台账和故障单，所以不走通用动作，
+// 统一收口到 repair-service 的事务函数，三个页面看到的进度才一致。
 function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
+  const id = Number(row.id)
+  const result =
+    action === '报修设备'
+      ? reportDeviceFault(id, undefined, store.operator)
+      : action === '确认修复'
+        ? confirmRepair(id)
+        : retireDevice(id)
   if (!result.ok) {
     errorMessage.value = result.message
     return

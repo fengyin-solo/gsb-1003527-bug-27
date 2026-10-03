@@ -67,6 +67,45 @@
       <span>共 {{ total }} 条通讯系统记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
+
+    <h3 class="section-title">通讯故障单</h3>
+    <p class="page-desc">
+      故障单随遥测设备报修生成，确认修复后自动关闭；设备进度实时读取遥测设备侧的最新状态。
+    </p>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th v-for="column in orderColumns" :key="column">{{ column }}</th>
+          <th>处理入口</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="order in faultOrders" :key="order.id">
+          <td>{{ order.单号 }}</td>
+          <td>{{ order.设备编号 }}</td>
+          <td>{{ order.所属站点 }}</td>
+          <td>{{ order.故障类型 }}</td>
+          <td>{{ order.报修时间 }}</td>
+          <td>{{ order.恢复时间 || '—' }}</td>
+          <td>{{ order.处理进度 }}</td>
+          <td>{{ order.设备进度 }}</td>
+          <td class="row-actions">
+            <button
+              v-if="order.处理进度 === '待处理'"
+              class="link"
+              type="button"
+              @click="confirmOrder(order)"
+            >
+              确认修复
+            </button>
+            <span v-else>已关闭</span>
+          </td>
+        </tr>
+        <tr v-if="!faultOrders.length">
+          <td :colspan="orderColumns.length + 1" class="empty-state">暂无通讯故障单</td>
+        </tr>
+      </tbody>
+    </table>
   </section>
 </template>
 
@@ -79,19 +118,22 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
-import type { EntryRow } from '@/data/types'
+import { confirmRepair, listFaultOrderViews } from '@/api/repair-service'
+import type { EntryRow, FaultOrderView } from '@/data/types'
 
 const meta = moduleMeta('communication')
 const columns = ["设备编号", "设备类型", "所属站点", "通讯协议", "信号强度", "最近通讯时刻", "维护人员", "设备状态"]
 const actions = ["登记故障", "确认恢复", "申请更换"]
 const statuses = ["通讯正常", "信号弱", "通讯中断", "待更换"]
 const stats = [{"label": "设备总数", "value": 0}, {"label": "通讯正常数", "value": 0}, {"label": "中断设备数", "value": 0}]
+const orderColumns = ["单号", "设备编号", "所属站点", "故障类型", "报修时间", "恢复时间", "处理进度", "设备进度"]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const faultOrders = ref<FaultOrderView[]>([])
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -122,12 +164,24 @@ function runAction(action: string, row: EntryRow) {
   reload()
 }
 
+// 故障单的处理入口和设备详情页、维护台账页走同一个确认修复事务
+function confirmOrder(order: FaultOrderView) {
+  errorMessage.value = ''
+  const result = confirmRepair(order.设备ID)
+  if (!result.ok) {
+    errorMessage.value = result.message
+    return
+  }
+  reload()
+}
+
 function reload() {
   errorMessage.value = ''
   try {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    faultOrders.value = listFaultOrderViews()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '通讯系统列表读取失败'
   }
