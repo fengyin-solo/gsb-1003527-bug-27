@@ -63,6 +63,27 @@
       </tbody>
     </table>
 
+    <h3 class="section-title">通讯故障单（遥测设备报修联动生成，设备进度实时读取设备侧）</h3>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th v-for="column in ticketColumns" :key="column">{{ column }}</th>
+          <th>工单状态</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="ticket in ticketRows" :key="String(ticket.id)">
+          <td v-for="column in ticketColumns" :key="column">
+            {{ column === '设备进度' ? deviceProgress(ticket) : (ticket[column] || '—') }}
+          </td>
+          <td>{{ ticket.status }}</td>
+        </tr>
+        <tr v-if="!ticketRows.length">
+          <td :colspan="ticketColumns.length + 1" class="empty-state">暂无通讯故障单</td>
+        </tr>
+      </tbody>
+    </table>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条通讯系统记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -79,6 +100,7 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { deviceProgressOf, listCommFaultTickets } from '@/api/repair-chain'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('communication')
@@ -92,6 +114,14 @@ const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+
+// 通讯故障单：本页不自己维护设备进度，展示时实时关联遥测设备当前状态。
+const ticketColumns = ["故障单号", "设备编号", "所属站点", "故障类型", "报修时间", "设备进度"]
+const ticketRows = ref<EntryRow[]>([])
+function deviceProgress(ticket: EntryRow): string {
+  return deviceProgressOf(String(ticket['设备编号']))
+}
+
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -128,6 +158,7 @@ function reload() {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    ticketRows.value = listCommFaultTickets()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '通讯系统列表读取失败'
   }
@@ -135,3 +166,7 @@ function reload() {
 
 onMounted(reload)
 </script>
+
+<style scoped>
+.section-title { font-size: 15px; margin: 20px 0 8px; }
+</style>

@@ -8,6 +8,8 @@ const Rainfall = () => import('@/views/rainfall/index.vue')
 const Waterquality = () => import('@/views/waterquality/index.vue')
 const Crosssection = () => import('@/views/crosssection/index.vue')
 const Telemetry = () => import('@/views/telemetry/index.vue')
+const TelemetryDetail = () => import('@/views/telemetry/detail.vue')
+const Maintenance = () => import('@/views/maintenance/index.vue')
 const Compilation = () => import('@/views/compilation/index.vue')
 const Warning = () => import('@/views/warning/index.vue')
 const Groundwater = () => import('@/views/groundwater/index.vue')
@@ -31,6 +33,8 @@ const router = createRouter({
     { path: '/waterquality', name: 'waterquality', component: Waterquality },
     { path: '/crosssection', name: 'crosssection', component: Crosssection },
     { path: '/telemetry', name: 'telemetry', component: Telemetry },
+    { path: '/telemetry/:id', name: 'telemetry-detail', component: TelemetryDetail },
+    { path: '/maintenance', name: 'maintenance', component: Maintenance },
     { path: '/compilation', name: 'compilation', component: Compilation },
     { path: '/warning', name: 'warning', component: Warning },
     { path: '/groundwater', name: 'groundwater', component: Groundwater },
